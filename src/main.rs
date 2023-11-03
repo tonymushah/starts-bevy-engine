@@ -1,9 +1,9 @@
 use bevy::prelude::*;
-use plugins::window_test::WindowTestPlugin;
+use plugins::a3d_scene::A3dScenePlugin;
 pub mod plugins;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, WindowTestPlugin))
+        .add_plugins((DefaultPlugins, A3dScenePlugin))
         .run();
 }
