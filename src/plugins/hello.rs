@@ -6,9 +6,11 @@ struct Person;
 #[derive(Component)]
 struct Name(String);
 
+/*
 fn hello_world() {
     println!("Hello world!");
 }
+*/
 
 fn add_people(mut commands: Commands) {
     commands.spawn((Person, Name("Tony".to_string())));
