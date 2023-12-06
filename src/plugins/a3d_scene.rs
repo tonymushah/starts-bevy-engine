@@ -18,6 +18,7 @@ pub struct MyCube {
     have_dashed: HaveDashed,
     move_speed: MoveSpeed,
     is_on_ground: IsOnGround,
+    last_key_pressed: LastKeyPressed,
 }
 
 impl Default for MyCube {
@@ -33,6 +34,7 @@ impl Default for MyCube {
             have_dashed: HaveDashed(false),
             move_speed: MoveSpeed(2.0),
             is_on_ground: IsOnGround(false),
+            last_key_pressed: LastKeyPressed::default(),
         }
     }
 }
@@ -95,6 +97,9 @@ pub struct Ground;
 
 #[derive(Component)]
 pub struct Player;
+
+#[derive(Clone, Copy, Component, Debug, Default)]
+pub struct LastKeyPressed(pub(crate) Option<KeyCode>);
 
 #[derive(Component)]
 pub struct MainCamera;
@@ -181,25 +186,15 @@ type MFPlayer<'world, 'state, 'a> = Query<
     (With<Player>, With<ControllableCube>),
 >;
 
-fn move_forward(
-    mut commands: Commands,
-    mut player: MFPlayer,
-    input: Res<Input<KeyCode>>,
-    timer: Res<Time>,
-) {
-    if input.pressed(KeyCode::W) {
-        if let Ok((mut transform, is_on_ground, move_speed, mut have_dashed, entity)) =
-            player.get_single_mut()
-        {
+fn move_forward(mut player: MFPlayer, input: Res<Input<KeyCode>>, timer: Res<Time>) {
+    if input.pressed(KeyCode::W)
+        || input.pressed(KeyCode::A)
+        || input.pressed(KeyCode::S)
+        || input.pressed(KeyCode::D)
+    {
+        if let Ok((mut transform, _, move_speed, _, _)) = player.get_single_mut() {
             let next = transform.forward();
-            if **is_on_ground {
-                transform.translation += next * (*move_speed * timer.delta_seconds());
-            } else if !**have_dashed {
-                commands
-                    .entity(entity)
-                    .insert(ExternalImpulse::new(next * 2.0));
-                have_dashed.set_inner(true);
-            }
+            transform.translation += next * (*move_speed * timer.delta_seconds());
         }
     }
 }
@@ -207,7 +202,7 @@ fn move_forward(
 type HMControllableCubes<'world, 'state, 'a> = Query<
     'world,
     'state,
-    (&'a mut Transform, &'a MoveSpeed),
+    (&'a mut Transform, &'a MoveSpeed, &'a mut LastKeyPressed),
     (With<ControllableCube>, With<Player>),
 >;
 
@@ -216,18 +211,22 @@ fn handle_mouvement(
     input: Res<Input<KeyCode>>,
     timer: Res<Time>,
 ) {
-    if let Ok((mut transform, inner)) = controllable_cubes.get_single_mut() {
-        if input.pressed(KeyCode::A) {
-            transform.rotate_local_y(*inner * (-PI / 2.0) * timer.delta_seconds());
-            //move_forward(&mut transform, inner, &timer);
+    if let Ok((mut transform, _, mut last_key_pressed)) = controllable_cubes.get_single_mut() {
+        if input.pressed(KeyCode::A) && last_key_pressed.0 != Some(KeyCode::A) {
+            transform.rotate_local_y(-PI * timer.delta_seconds());
+            last_key_pressed.0 = Some(KeyCode::A);
         }
-        if input.pressed(KeyCode::D) {
-            transform.rotate_local_y(*inner * (PI / 2.0) * timer.delta_seconds());
-            //move_forward(&mut transform, inner, &timer);
+        if input.pressed(KeyCode::D) && last_key_pressed.0 != Some(KeyCode::D) {
+            transform.rotate_local_y(PI * timer.delta_seconds());
+            last_key_pressed.0 = Some(KeyCode::D);
         }
-        if input.pressed(KeyCode::S) {
-            transform.rotate_local_y(*inner * PI * timer.delta_seconds());
-            //move_forward(&mut transform, inner, &timer);
+        if input.pressed(KeyCode::S) && last_key_pressed.0 != Some(KeyCode::S) {
+            transform.rotate_local_y((PI / 2.0) * timer.delta_seconds());
+            last_key_pressed.0 = Some(KeyCode::S);
+        }
+        if input.pressed(KeyCode::W) && last_key_pressed.0 != Some(KeyCode::W) {
+            transform.rotate_local_y((-PI / 2.0) * timer.delta_seconds());
+            last_key_pressed.0 = Some(KeyCode::W);
         }
     }
 }
@@ -248,23 +247,21 @@ fn handle_is_ground(
     grounds: Query<Entity, With<Ground>>,
 ) {
     if let Ok(ground) = grounds.get_single() {
-        if let Ok((mut state, entities, mut have_dashed)) = controllable_cubes.get_single_mut() {
+        if let Ok((mut state, entities, _)) = controllable_cubes.get_single_mut() {
             if !**state && entities.iter().any(|e| e.eq(&ground)) {
-                println!("setting is_on_ground");
                 state.set_inner(true);
-                have_dashed.set_inner(false);
+            } else {
+                state.set_inner(false);
             }
         }
-    } else {
-        println!("no ground found")
     }
 }
 
 type HJPlayer<'world, 'state, 'a> =
-    Query<'world, 'state, (Entity, &'a IsOnGround), (With<ControllableCube>, With<Player>)>;
+    Query<'world, 'state, (&'a mut IsOnGround, Entity), (With<ControllableCube>, With<Player>)>;
 
 fn handle_jump(mut commands: Commands, player: HJPlayer, input: Res<Input<KeyCode>>) {
-    if let Ok((entity, state)) = player.get_single() {
+    if let Ok((state, entity)) = player.get_single() {
         if input.pressed(KeyCode::Space) && **state {
             commands
                 .entity(entity)
