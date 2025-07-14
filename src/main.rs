@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 
 #[derive(Debug, AsBindGroup, TypePath, Asset, Clone)]
@@ -11,7 +13,10 @@ impl Material for MyCustomShader {
         "shaders/custom_shader.wgsl".into()
     }
     fn alpha_mode(&self) -> AlphaMode {
-        AlphaMode::Add
+        AlphaMode::Blend
+    }
+    fn vertex_shader() -> bevy::render::render_resource::ShaderRef {
+        "shaders/custom_shader.wgsl".into()
     }
 }
 
@@ -23,6 +28,7 @@ fn setup(
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
         MeshMaterial3d(my_custom_shaders.add(MyCustomShader { time: 0.0 })),
+        Rotatable { speed: 0.3 },
     ));
 
     commands.spawn((
@@ -56,6 +62,16 @@ fn update_time_texture(mut my_custom_shaders: ResMut<Assets<MyCustomShader>>, ti
         material.time = time.elapsed_secs();
     }
 }
+#[derive(Component)]
+struct Rotatable {
+    speed: f32,
+}
+
+fn rotate_cube(mut cubes: Query<(&mut Transform, &Rotatable)>, timer: Res<Time>) {
+    for (mut transform, cube) in &mut cubes {
+        transform.rotate_y(cube.speed * TAU * timer.delta_secs());
+    }
+}
 
 fn main() {
     App::new()
@@ -71,5 +87,6 @@ fn main() {
         .add_plugins(MaterialPlugin::<MyCustomShader>::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update_time_texture)
+        .add_systems(FixedUpdate, rotate_cube)
         .run();
 }
