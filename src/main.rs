@@ -11,7 +11,7 @@ impl Material for MyCustomShader {
         "shaders/custom_shader.wgsl".into()
     }
     fn alpha_mode(&self) -> AlphaMode {
-        AlphaMode::AlphaToCoverage
+        AlphaMode::Add
     }
 }
 
@@ -51,15 +51,9 @@ fn setup(
     ));
 }
 
-fn update_time_texture(
-    mut my_custom_shaders: ResMut<Assets<MyCustomShader>>,
-    time: Res<Time>,
-    has_materials: Query<&MeshMaterial3d<MyCustomShader>>,
-) {
-    for has_material in has_materials {
-        if let Some(material) = my_custom_shaders.get_mut(has_material) {
-            material.time = time.elapsed_secs();
-        }
+fn update_time_texture(mut my_custom_shaders: ResMut<Assets<MyCustomShader>>, time: Res<Time>) {
+    for (_, material) in my_custom_shaders.iter_mut() {
+        material.time = time.elapsed_secs();
     }
 }
 
